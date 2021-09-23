@@ -107,7 +107,7 @@ class MultiBoxLoss(nn.Module):
         # 正样本的定位真值
         loc_t = loc_t[pos_idx].view(-1, 4)
         # 所有正样本的定位损失
-        loss_l = F.smooth_l1_loss(loc_p, loc_t, size_average=False)
+        loss_l = F.smooth_l1_loss(loc_p, loc_t, reduction='sum')
 
         # 3 对于类别损失,进行难样本挖掘,控制比例为1:3
 
@@ -120,8 +120,9 @@ class MultiBoxLoss(nn.Module):
         # Hard Negative Mining
         loss_c = loss_c.view(pos.size()[0], pos.size()[1])
         # 首先过滤掉正样本
-        loss_c[pos] = 0  # filter out pos boxes for now
         loss_c = loss_c.view(num, -1)
+        loss_c[pos] = 0  # filter out pos boxes for now
+        
         _, loss_idx = loss_c.sort(1, descending=True)
         # idx_rank为排序后每个元素的排名
         _, idx_rank = loss_idx.sort(1)
@@ -146,8 +147,13 @@ class MultiBoxLoss(nn.Module):
 
         # Sum of losses: L(x,c,l,g) = (Lconf(x, c) + αLloc(x,l,g)) / N
 
-        N = num_pos.data.sum()
-
-        loss_l /= N.type('torch.cuda.FloatTensor')
-        loss_c /= N.type('torch.cuda.FloatTensor')
+        N = num_pos.data.sum().double()
+        if N == 0:
+            raise ValueError("num_pos is zero")
+        loss_l = loss_l.double()
+        loss_c = loss_c.double()
+        loss_l /= N
+        loss_c /= N
+        # loss_l /= N.type('torch.cuda.FloatTensor')
+        # loss_c /= N.type('torch.cuda.FloatTensor')
         return loss_l, loss_c

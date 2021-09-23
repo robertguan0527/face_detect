@@ -1,6 +1,9 @@
 # from layers.box_utils import point_form
+import csv
 import torch
+
 from torch.utils.data import Dataset
+from utils.csv_wr import csv_write, csv_writerows
 import torchvision.transforms as transfroms
 import matplotlib.pyplot as plt
 import os
@@ -8,6 +11,7 @@ import PIL.Image as Image
 import PIL
 import cv2
 import numpy as np
+
 
 FACE_CLASSES =('face',)
 
@@ -21,33 +25,35 @@ class WiderAnnotationTransformer(object):
    
     def __call__(self,target,width,height):# target is rects
         
-        target = self._change_point_form(target)
+        
         res =[]
+        if not target:
+            raise ValueError('target is None')
         for bbox in target:
-            bndbox =[]
-            for pos_index,cur_pt in enumerate(bbox) :
+            bndbox =self._change_point_form(bbox,width,height)
+            for pos_index,cur_pt in enumerate(bndbox) :
                 if pos_index % 2 == 0 :
-                    cur_pt = cur_pt/width 
+                    bndbox[pos_index] = cur_pt/width 
                 else:
-                    cur_pt = cur_pt/height
-                bndbox.append(cur_pt)
+                    bndbox[pos_index] = cur_pt/height
+                
             label_idx = self.class_to_ind['face']
             bndbox.append(label_idx) #label_idx for face just 0
             res +=[bndbox]
         return res
 
 
-    def _change_point_form(self,boxs):
-        bboxs = []
-        for b in boxs:
-            if b[2]<2 or b[3]<2 or b[0]<0 or b[1]<0:
-                continue
-            b[0]=float(b[0]-b[2]/2)
-            b[1]=float(b[1]-b[3]/2)
-            b[2]=float(b[0]+b[2]/2)
-            b[3]=float(b[1]+b[3]/2)
-            bboxs.append(b)
-        return bboxs
+    def _change_point_form(self,box,width,height):
+       
+        x,y,w,h = box
+        # if b[2]<2 or b[3]<2 or b[0]<0 or b[1]<0:
+        #     continue
+        box[0]=max(float(x-w/2),0)
+        box[1]=max(float(y-h/2),0)
+        box[2]=min(float(x+w/2),width)
+        box[3]=min(float(y+h/2),height)
+            
+        return box
 
 
 
@@ -58,20 +64,23 @@ class WiderFaceDataset(Dataset):
         super(WiderFaceDataset, self).__init__()
         self.root = root
         self._images_folder = os.path.join(root,'widerface',f"WIDER_{image_sets}","images")
-        self._gt_path = os.path.join(root, 'widerface','wider_face_split',f"wider_face_{image_sets}_bbx_gt.txt")
+        self._gt_path = os.path.join(root, 'widerface','wider_face_split',f"wider_face_{image_sets}_bbx_gt_clean.txt")
         self.images_name_list = []
         self.ground_truth = []
+    
         self.name = dataset_name
         # print(self._gt_path)
         with open(self._gt_path, 'r') as f:
             for i in f:
+                if len(i) == 0:
+                    continue
                 self.images_name_list.append(i.rstrip())
                 self.ground_truth.append(i.rstrip())
 
         self.images_name_list = list(filter(lambda x: x.endswith('.jpg') or x.endswith('.bmp'),
                                        self.images_name_list))
         # print(len(self.images_name_list))
-
+        # csv_writerows('annotation.csv',zip(self.images_name_list,self.ground_truth))
         self.transform = transform
         self.target_transform = target_transform
 
@@ -80,16 +89,23 @@ class WiderFaceDataset(Dataset):
 
     def __getitem__(self, index):
         image_name = self.images_name_list[index]
+        # print(image_name)
         # 查找文件名
         loc = self._search(image_name)
         # 解析人脸个数
+        
         face_nums = int(self.ground_truth[loc + 1])
+        if not face_nums:
+            # face_nums+=1
+            raise ValueError(f"{face_nums}, {image_name},{self.ground_truth[loc + 1]},{loc}") 
         # 读取矩形框
         rects = []
         for i in range(loc + 2, loc + 2 + face_nums):
             line = self.ground_truth[i]
             x, y, w, h = line.split(' ')[:4]
-            x, y, w, h = list(map(lambda k: int(k), [x, y, w, h]))
+            if x =='' or y =='' or w == '' or h == '':
+                raise ValueError('target maybe is empty') 
+            x, y, w, h = list(map(lambda k: int(k), [x, y, w, h]))                          
             rects.append([x, y, w, h])
 
         # 图像
@@ -100,16 +116,24 @@ class WiderFaceDataset(Dataset):
             
             target = self.target_transform(rects,width,height)  
             
-
+        csv_write('pic_log.csv',[os.path.join(self._images_folder, image_name),rects])
         if self.transform is not None:
             target = np.array(target)
-            img, boxes, labels = self.transform(image, target[:, :4], target[:, 4])
+            try:
+                img, boxes, labels = self.transform(image, target[:, :4], target[:, 4])
+            except Exception as e:
+                print(target,type(target),image_name)
+
+            # img = transfroms.Normalize(mean = [0.485, 0.456, 0.406],std = [0.229, 0.224, 0.225])(torch.from_numpy(img))
+            # boxes_tensor = torch.from_numpy(boxes)
+            
+            # boxes = boxes_tensor.numpy()
             # to rgb
             img = img[:, :, (2, 1, 0)]
             # img = img.transpose(2, 0, 1)
             target = np.hstack((boxes, np.expand_dims(labels, axis=1)))
  
-
+        # print(image_name)
 # /userdir/guanyihua1993/tmp/pycharm_project_robert0806/ssd-pytorch/weights
         return torch.from_numpy(img).permute(2,0,1), target
 
@@ -125,9 +149,12 @@ class WiderFaceDataset(Dataset):
         return cv2.imread(os.path.join(self._images_folder, img_id),cv2.IMREAD_COLOR)
 
 
-
-    
    
+if __name__ =="__main__":
+    gt = [[620,103,12,18]]
+    gt = WiderAnnotationTransformer()(gt,1024,800)
+    print(gt)
+
 
 
    

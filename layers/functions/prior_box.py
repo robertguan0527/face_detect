@@ -38,16 +38,19 @@ class PriorBox(object):
 
                 # 对应{S_k, S_k}大小的PriorBox
                 s_k = self.min_sizes[k]/self.image_size
-                mean += [cx, cy, s_k, s_k]
+                mean.append([cx, cy, s_k, s_k]) 
 
                 # 对应{√(S_k S_(k+1) ), √(S_k S_(k+1) )}大小的PriorBox
                 s_k_prime = sqrt(s_k * (self.max_sizes[k]/self.image_size))
-                mean += [cx, cy, s_k_prime, s_k_prime]
+                mean.append([cx, cy, s_k_prime, s_k_prime])
 
                 # 剩余的比例为2、1/2、3、1/3的PriorBox
                 for ar in self.aspect_ratios[k]:
-                    mean += [cx, cy, s_k*sqrt(ar), s_k/sqrt(ar)]
-                    mean += [cx, cy, s_k/sqrt(ar), s_k*sqrt(ar)]
+                  
+                    
+                    mean.append([cx, cy, s_k*sqrt(ar), s_k/sqrt(ar)]) 
+                    mean.append([cx, cy, s_k/sqrt(ar), s_k*sqrt(ar)]) 
+            # print(len(mean), self.feature_maps[k],k)
         # back to torch land
         output = torch.Tensor(mean).view(-1, 4)
         if self.clip:

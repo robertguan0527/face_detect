@@ -76,7 +76,7 @@ class SubtractMeans(object):
     def __call__(self, image, boxes=None, labels=None):
         image = image.astype(np.float32)
         image -= self.mean
-        return image.astype(np.float32), boxes, labels
+        return image.astype(np.float32)/255, boxes, labels
 
 
 class ToAbsoluteCoords(object):
@@ -106,9 +106,11 @@ class Resize(object):
         self.size = size
 
     def __call__(self, image, boxes=None, labels=None):
+      
         image = cv2.resize(image, (self.size,
                                  self.size))
-        return image, boxes, labels
+        image = image.astype(np.float32)
+        return image/255, boxes, labels
 
 
 class RandomSaturation(object):
@@ -401,24 +403,39 @@ class PhotometricDistort(object):
         im, boxes, labels = distort(im, boxes, labels)
         return self.rand_light_noise(im, boxes, labels)
 
+class Normalize_Transform(object):
+    def __init__(self, mean, std):
+        self.mean = mean
+        self.std = std
 
+    def __call__(self, image, boxes=None, labels=None):
+        image = image/255
+      
+        image = transforms.Normalize(mean =self.mean, std = self. std)(image)
+        
+        return image, boxes, labels
 class SSDAugmentation(object):
     def __init__(self, size=300, mean=(104, 117, 123)):
+       
         self.mean = mean
         self.size = size
         self.augment = Compose([
             # 首先将图像像素值从整型变成浮点型
             ConvertFromInts(),
-            # 将标签中的边框从比例坐标变换为真实坐标
+            # # 将标签中的边框从比例坐标变换为真实坐标
             ToAbsoluteCoords(),
-            # 因此进行亮度、对比度、色相与饱和度的随机调整，然后随机调换通道
+            # # 因此进行亮度、对比度、色相与饱和度的随机调整，然后随机调换通道
             PhotometricDistort(),
             Expand(self.mean), # 随机扩展图像大小，图像仅靠右下方
             RandomSampleCrop(), # 随机裁剪图像
             RandomMirror(), # 随机左右镜像
-            # ToPercentCoords(), # 从真实坐标变回比例坐标
+            ToPercentCoords(), # 从真实坐标变回比例坐标
             Resize(self.size), # 缩放到固定的300*300大小
-            SubtractMeans(self.mean) # 最后进行均值化
+            # Normalize_Transform([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
+            # SubtractMeans(self.mean),
+             # 最后进行均值化
+            
+            
         ])
 
     def __call__(self, img, boxes, labels):
