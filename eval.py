@@ -9,8 +9,10 @@ import torch
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
 from torch.autograd import Variable
-from data import VOC_ROOT, VOCAnnotationTransform, VOCDetection, BaseTransform
+from data import VOC_ROOT, VOCAnnotationTransform, VOCDetection, BaseTransform, widerface
+from data import WiderAnnotationTransformer,WiderFaceDataset,FACE_CLASSES
 from data import VOC_CLASSES as labelmap
+from data import root_path,FACE_CLASSES as facemap
 import torch.utils.data as data
 
 from ssd import build_ssd
@@ -36,7 +38,7 @@ def str2bool(v):
 parser = argparse.ArgumentParser(
     description='Single Shot MultiBox Detector Evaluation')
 parser.add_argument('--trained_model',
-                    default='weights/ssd300_mAP_77.43_v2.pth', type=str,
+                    default='weights/ssd300_widerface_115000.pth', type=str,
                     help='Trained state_dict file path to open')
 parser.add_argument('--save_folder', default='eval/', type=str,
                     help='File path to save results')
@@ -46,7 +48,7 @@ parser.add_argument('--top_k', default=5, type=int,
                     help='Further restrict the number of predictions to parse')
 parser.add_argument('--cuda', default=True, type=str2bool,
                     help='Use cuda to train model')
-parser.add_argument('--voc_root', default=VOC_ROOT,
+parser.add_argument('--voc_root', default=root_path,
                     help='Location of VOC root directory')
 parser.add_argument('--cleanup', default=True, type=str2bool,
                     help='Cleanup and remove results files following eval')
@@ -420,15 +422,15 @@ def evaluate_detections(box_list, output_dir, dataset):
 
 if __name__ == '__main__':
     # load net
-    num_classes = len(labelmap) + 1                      # +1 for background
+    num_classes = len(facemap) + 1                      # +1 for background
     net = build_ssd('test', 300, num_classes)            # initialize SSD
     net.load_state_dict(torch.load(args.trained_model))
     net.eval()
     print('Finished loading model!')
     # load data
-    dataset = VOCDetection(args.voc_root, [('2007', set_type)],
+    dataset = WiderFaceDataset(args.voc_root, 'val',
                            BaseTransform(300, dataset_mean),
-                           VOCAnnotationTransform())
+                           WiderAnnotationTransformer())
     if args.cuda:
         net = net.cuda()
         cudnn.benchmark = True

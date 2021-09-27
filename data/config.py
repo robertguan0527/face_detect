@@ -3,7 +3,7 @@ import os.path
 
 # gets home dir cross platform
 HOME = os.path.expanduser('~')
-
+root_path = r'/userdir/guanyihua1993/tmp/pycharm_project_robert0806/data_sets'
 # for making bounding boxes pretty
 COLORS = ((255, 0, 0, 128), (0, 255, 0, 128), (0, 0, 255, 128),
           (0, 255, 255, 128), (255, 0, 255, 128), (255, 255, 0, 128))

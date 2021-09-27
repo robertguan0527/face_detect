@@ -1,6 +1,6 @@
 from data.widerface import WiderAnnotationTransformer, WiderFaceDataset
 from data import *
-
+from data import root_path
 from utils.augmentations import SSDAugmentation
 from layers.modules import MultiBoxLoss
 import ssd
@@ -21,10 +21,6 @@ import argparse
 
 def str2bool(v):
     return v.lower() in ("yes", "true", "t", "1")
-
-
-        
-
 
 
 parser = argparse.ArgumentParser(
@@ -82,7 +78,7 @@ def train():
     cfg = widerface_config
 
     
-    root_path = r'/userdir/guanyihua1993/tmp/pycharm_project_robert0806/data_sets'
+   
     # 利用VOCDetection重写了Dataset类，并传入了所需的数据变换transform
     dataset_train = WiderFaceDataset(root_path,image_sets='train',transform = SSDAugmentation(cfg['min_dim'],MEANS))
     # dataset_train = WiderFaceDataset(root_path,image_sets='train',transform = None)

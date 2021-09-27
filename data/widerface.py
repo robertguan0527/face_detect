@@ -48,10 +48,14 @@ class WiderAnnotationTransformer(object):
         x,y,w,h = box
         # if b[2]<2 or b[3]<2 or b[0]<0 or b[1]<0:
         #     continue
-        box[0]=max(float(x-w/2),0)
-        box[1]=max(float(y-h/2),0)
-        box[2]=min(float(x+w/2),width)
-        box[3]=min(float(y+h/2),height)
+        box[0]=x
+        box[1]=y
+        if width<30 or height<30:
+            box[2]=x+w
+            box[3]=y+h
+        else:
+            box[2]=min(x+w,width)
+            box[3]=min(y+h,height)
             
         return box
 
@@ -63,8 +67,9 @@ class WiderFaceDataset(Dataset):
 # root is the path of data folder's location
         super(WiderFaceDataset, self).__init__()
         self.root = root
+        self.image_sets = image_sets
         self._images_folder = os.path.join(root,'widerface',f"WIDER_{image_sets}","images")
-        self._gt_path = os.path.join(root, 'widerface','wider_face_split',f"wider_face_{image_sets}_bbx_gt_clean.txt")
+        self._gt_path = os.path.join(root, 'widerface','wider_face_split',f"wider_face_{image_sets}_bbx_gt.txt")
         self.images_name_list = []
         self.ground_truth = []
     
@@ -87,7 +92,15 @@ class WiderFaceDataset(Dataset):
     def __len__(self):
         return len(self.images_name_list)
 
-    def __getitem__(self, index):
+
+
+    def __getitem__(self, index: int):
+        im,gt,h,w = self.pull_item(index)
+        return im, gt
+
+
+
+    def pull_item(self, index):
         image_name = self.images_name_list[index]
         # print(image_name)
         # 查找文件名
@@ -104,7 +117,10 @@ class WiderFaceDataset(Dataset):
             line = self.ground_truth[i]
             x, y, w, h = line.split(' ')[:4]
             if x =='' or y =='' or w == '' or h == '':
-                raise ValueError('target maybe is empty') 
+                raise ValueError('target maybe is empty')
+            if self.image_sets =='train':
+                if int(w)<=30 or int(h)<=30:
+                    continue
             x, y, w, h = list(map(lambda k: int(k), [x, y, w, h]))                          
             rects.append([x, y, w, h])
 
@@ -113,9 +129,10 @@ class WiderFaceDataset(Dataset):
         height, width, chanels = image.shape
 
         if self.target_transform is not None:
-            
-            target = self.target_transform(rects,width,height)  
-            
+            if rects:
+                target = self.target_transform(rects,width,height)  
+            else:
+                return None, None,height,width
         csv_write('pic_log.csv',[os.path.join(self._images_folder, image_name),rects])
         if self.transform is not None:
             target = np.array(target)
@@ -135,7 +152,7 @@ class WiderFaceDataset(Dataset):
  
         # print(image_name)
 # /userdir/guanyihua1993/tmp/pycharm_project_robert0806/ssd-pytorch/weights
-        return torch.from_numpy(img).permute(2,0,1), target
+        return torch.from_numpy(img).permute(2,0,1), target, height, width
 
     def _search(self, image_name):
         for i, line in enumerate(self.ground_truth):
@@ -148,7 +165,47 @@ class WiderFaceDataset(Dataset):
         img_id = self.images_name_list[index]
         return cv2.imread(os.path.join(self._images_folder, img_id),cv2.IMREAD_COLOR)
 
+      
+    def pull_anno(self, index):
+        img_id = self.images_name_list[index]
+        # print(image_name)
+        # 查找文件名
+        loc = self._search(img_id)
+        # 解析人脸个数
+        
+        face_nums = int(self.ground_truth[loc + 1])
+   
+        # 读取矩形框
+        rects = []
+        for i in range(loc + 2, loc + 2 + face_nums):
+            line = self.ground_truth[i]
+            x, y, w, h = line.split(' ')[:4]
+            if x =='' or y =='' or w == '' or h == '':
+                raise ValueError('target maybe is empty') 
+         
+            x, y, w, h = list(map(lambda k: int(k), [x, y, w, h]))                          
+            rects.append([x, y, w, h])
+        gt = self.target_transform(rects,1,1)
+        return img_id,gt
+    
+    
+      
+       
+    
 
+    def pull_tensor(self, index):
+        '''Returns the original image at an index in tensor form
+
+        Note: not using self.__getitem__(), as any transformations passed in
+        could mess up this functionality.
+
+        Argument:
+            index (int): index of img to show
+        Return:
+            tensorized version of img, squeezed
+        '''
+        return torch.Tensor(self.pull_image(index)).unsqueeze_(0)
+ 
    
 if __name__ =="__main__":
     gt = [[620,103,12,18]]
