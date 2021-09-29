@@ -51,11 +51,11 @@ class WiderAnnotationTransformer(object):
         box[0]=x
         box[1]=y
         if width<30 or height<30:
-            box[2]=x+w
-            box[3]=y+h
+            box[2]=x+w-1
+            box[3]=y+h-1
         else:
-            box[2]=min(x+w,width)
-            box[3]=min(y+h,height)
+            box[2]=min(x+w-1,width)
+            box[3]=min(y+h-1,height)
             
         return box
 

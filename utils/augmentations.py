@@ -110,7 +110,7 @@ class Resize(object):
         image = cv2.resize(image, (self.size,
                                  self.size))
         image = image.astype(np.float32)
-        return image/255, boxes, labels
+        return image, boxes, labels
 
 
 class RandomSaturation(object):
@@ -432,7 +432,7 @@ class SSDAugmentation(object):
             ToPercentCoords(), # 从真实坐标变回比例坐标
             Resize(self.size), # 缩放到固定的300*300大小
             # Normalize_Transform([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
-            # SubtractMeans(self.mean),
+            SubtractMeans(self.mean),
              # 最后进行均值化
             
             

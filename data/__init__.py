@@ -22,6 +22,8 @@ def detection_collate(batch):
     targets = []
     imgs = []
     for sample in batch:
+        if sample[0] is None:
+            continue
         imgs.append(sample[0])
         targets.append(torch.FloatTensor(sample[1]))
     # print(imgs[0].shape,imgs[1].shape)    

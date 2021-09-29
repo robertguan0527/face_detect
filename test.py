@@ -2,6 +2,7 @@ from __future__ import print_function
 import sys
 import os
 import argparse
+from typing_extensions import Annotated
 import torch
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
@@ -14,6 +15,7 @@ from data import VOCAnnotationTransform, VOCDetection, BaseTransform, VOC_CLASSE
 from data import WiderAnnotationTransformer,WiderFaceDataset,FACE_CLASSES
 import torch.utils.data as data
 from ssd import build_ssd
+from utils.show_results import dawrects, write_pic
 
 parser = argparse.ArgumentParser(description='Single Shot MultiBox Detection')
 parser.add_argument('--trained_model', default='weights/ssd300_widerface_115000.pth',
@@ -26,6 +28,7 @@ parser.add_argument('--cuda', default=True, type=bool,
                     help='Use cuda to train model')
 parser.add_argument('--voc_root', default=root_path, help='Location of VOC root directory')
 parser.add_argument('-f', default=None, type=str, help="Dummy arg so we can load in Jupyter Notebooks")
+parser.add_argument('--result_folder',default = 'test_result/',type = str, help= 'path for save test results' )
 args = parser.parse_args()
 
 if args.cuda and torch.cuda.is_available():
@@ -35,6 +38,9 @@ else:
 
 if not os.path.exists(args.save_folder):
     os.mkdir(args.save_folder)
+
+if not os.path.exists(args.result_folder):
+    os.mkdir(args.result_folder)
 
 
 def test_net(save_folder, net, cuda, testset, transform, thresh):
@@ -61,6 +67,7 @@ def test_net(save_folder, net, cuda, testset, transform, thresh):
         scale = torch.Tensor([img.shape[1], img.shape[0],
                              img.shape[1], img.shape[0]])
         pred_num = 0
+        rects = []
         for i in range(detections.size(1)):
             j = 0
             while detections[0, i, j, 0] >= 0.6:
@@ -71,12 +78,17 @@ def test_net(save_folder, net, cuda, testset, transform, thresh):
                 label_name = facemap[i-1]
                 pt = (detections[0, i, j, 1:]*scale).cpu().numpy()
                 coords = (pt[0], pt[1], pt[2], pt[3])
+                rects.append(coords)
                 pred_num += 1
                 with open(filename, mode='a') as f:
                     f.write(str(pred_num)+' label: '+label_name+' score: ' +
                             str(score) + ' '+' || '.join(str(c) for c in coords) + '\n')
                 j += 1
-
+        if rects:
+            _, name = str(img_id).split(r'/')
+           
+            write_pic(img,annotation,rects,args.result_folder, name)
+                
 
 def test_voc():
     # load net

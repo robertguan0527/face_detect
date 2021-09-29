@@ -11,3 +11,5 @@ def csv_writerows(path,data):
     writer = csv.writer(f)
     writer.writerows(data)
     f.close()
+
+    
